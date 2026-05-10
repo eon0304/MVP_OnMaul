@@ -1,43 +1,73 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api, { logEvent } from "../../api/client";
-import { getUser, logout } from "../../api/auth";
+import { getUser } from "../../api/auth";
 
 const CATEGORIES = [
   { value: "", label: "전체" },
-  { value: "농사정보", label: "🌾 농사정보" },
-  { value: "지역용어관습", label: "📖 지역용어" },
-  { value: "오늘내이야기", label: "☀️ 오늘이야기" },
-  { value: "질문과답변", label: "❓ 질문답변" },
-  { value: "마을사진", label: "📷 마을사진" },
-  { value: "마을소식", label: "📢 마을소식" },
+  { value: "농사·약", label: "농사·약" },
+  { value: "동네정보", label: "동네정보" },
+  { value: "한마디", label: "한마디" },
+  { value: "나눔/거래", label: "나눔/거래" },
+  { value: "이장인증", label: "이장인증" },
 ];
 
-function UserTypeBadge({ type }) {
-  const map = { "이주민": "badge-immigrant", "주민": "badge-resident", "관리자": "badge-admin" };
-  return <span className={map[type] || "badge-immigrant"}>{type}</span>;
+const DUMMY_POSTS = [
+  { id: 1, category: "농사·약", time: "1시간 전", title: "오늘 농약 사러 갈 곳 추천?", comments: 12, likes: 10, badge: "이장인증" },
+  { id: 2, category: "동네정보", time: "3시간 전", title: "면사무소 주차장 주차 가능?", comments: 4, likes: 2, badge: null },
+  { id: 3, category: "잃어버림", time: "어제", title: "강아지 봤어요 (목동마을)", comments: 9, likes: 7, badge: null },
+  { id: 4, category: "한마디", time: "어제", title: "나물 무침 레시피 공유 🥬", comments: 21, likes: 19, badge: null },
+];
+
+function FeedItem({ post }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate(`/board/${post.id}`)}
+      className="w-full text-left px-5 py-4 border-b border-gray-100 last:border-0 hover:bg-white/50 transition-colors"
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-xs text-sub">{post.category}</span>
+        {post.badge && (
+          <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+            {post.badge}
+          </span>
+        )}
+        <span className="text-xs text-sub ml-auto">{post.time}</span>
+      </div>
+      <p className="text-sm font-semibold text-ink mb-2 leading-snug">{post.title}</p>
+      <div className="flex items-center gap-3 text-xs text-sub">
+        <span>💬 {post.comments}</span>
+        <span>♡ {post.likes}</span>
+      </div>
+    </button>
+  );
 }
 
-function PostCard({ post }) {
+function ApiFeedItem({ post }) {
+  const navigate = useNavigate();
+  const timeAgo = (dateStr) => {
+    const diff = Date.now() - new Date(dateStr);
+    const h = Math.floor(diff / 3600000);
+    if (h < 1) return "방금 전";
+    if (h < 24) return `${h}시간 전`;
+    return `${Math.floor(h / 24)}일 전`;
+  };
   return (
-    <Link to={`/board/${post.id}`} className="block card hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{post.category}</span>
-        <UserTypeBadge type={post.author_type} />
-        <span className="text-xs text-gray-400 ml-auto">{new Date(post.created_at).toLocaleDateString("ko-KR")}</span>
+    <button
+      onClick={() => navigate(`/board/${post.id}`)}
+      className="w-full text-left px-5 py-4 border-b border-gray-100 hover:bg-white/50 transition-colors"
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-xs text-sub">{post.category}</span>
+        <span className="text-xs text-sub ml-auto">{timeAgo(post.created_at)}</span>
       </div>
-      <h3 className="font-medium text-gray-900 text-sm mb-1 line-clamp-2">{post.title}</h3>
-      <p className="text-xs text-gray-500 line-clamp-2 mb-2">{post.content}</p>
-      {post.image_url && (
-        <img src={post.image_url} alt="" className="w-full h-32 object-cover rounded-lg mb-2" />
-      )}
-      <div className="flex items-center gap-3 text-xs text-gray-400">
-        <span>{post.author_nickname}</span>
-        <span>👍 {post.like_count}</span>
-        <span>💬 {post.comment_count}</span>
-        <span>👁 {post.view_count}</span>
+      <p className="text-sm font-semibold text-ink mb-2 leading-snug">{post.title}</p>
+      <div className="flex items-center gap-3 text-xs text-sub">
+        <span>💬 {post.comment_count ?? 0}</span>
+        <span>♡ {post.like_count ?? 0}</span>
       </div>
-    </Link>
+    </button>
   );
 }
 
@@ -45,44 +75,40 @@ export default function BoardPage() {
   const navigate = useNavigate();
   const user = getUser();
   const [category, setCategory] = useState("");
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [apiPosts, setApiPosts] = useState([]);
 
   useEffect(() => {
     logEvent("tab_view", { tab_name: "board" });
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
     api.get("/posts", { params: category ? { category } : {} })
-      .then(r => setPosts(r.data))
-      .finally(() => setLoading(false));
+      .then(r => setApiPosts(r.data))
+      .catch(() => setApiPosts([]));
   }, [category]);
 
+  const filteredDummy = category
+    ? DUMMY_POSTS.filter(p => p.category === category)
+    : DUMMY_POSTS;
+
+  const allPosts = [...filteredDummy];
+
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <h1 className="text-lg font-bold text-blue-600">온마을 게시판</h1>
-        {user ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">{user.nickname}</span>
-            <button onClick={() => { logout(); navigate("/login"); }} className="text-xs text-gray-400">로그아웃</button>
-          </div>
-        ) : (
-          <Link to="/login" className="text-sm text-blue-600 font-medium">로그인</Link>
-        )}
+    <div className="min-h-screen bg-cream">
+      {/* 헤더 */}
+      <header className="bg-cream px-5 pt-14 pb-3 flex items-center justify-between sticky top-0 z-10">
+        <h1 className="text-xl font-bold text-ink">게시판</h1>
+        <button className="text-ink text-lg">🔍</button>
       </header>
 
-      <div className="px-4 pt-3 pb-2 bg-white border-b border-gray-100 overflow-x-auto">
+      {/* 카테고리 칩 */}
+      <div className="px-4 pb-3 overflow-x-auto">
         <div className="flex gap-2 w-max">
           {CATEGORIES.map(c => (
             <button
               key={c.value}
               onClick={() => setCategory(c.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
                 category === c.value
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-maul border-maul text-ink font-bold"
+                  : "border-gray-300 text-sub bg-white"
               }`}
             >
               {c.label}
@@ -91,31 +117,23 @@ export default function BoardPage() {
         </div>
       </div>
 
-      <div className="p-4 space-y-3">
-        {loading ? (
-          <div className="text-center py-10 text-gray-400">불러오는 중...</div>
-        ) : posts.length === 0 ? (
-          <div className="text-center py-10">
-            <p className="text-gray-400 text-sm mb-3">이 카테고리의 첫 글을 작성해보세요</p>
-            {user && (
-              <button onClick={() => navigate("/board/new")} className="btn-outline text-sm px-4 py-2">
-                글쓰기
-              </button>
-            )}
-          </div>
+      {/* 피드 */}
+      <div className="bg-white rounded-2xl mx-4 shadow-sm overflow-hidden fade-in">
+        {allPosts.length === 0 ? (
+          <p className="text-center py-10 text-sub text-sm">이 카테고리의 첫 글을 작성해보세요</p>
         ) : (
-          posts.map(post => <PostCard key={post.id} post={post} />)
+          allPosts.map(p => <FeedItem key={p.id} post={p} />)
         )}
+        {apiPosts.map(p => <ApiFeedItem key={`api-${p.id}`} post={p} />)}
       </div>
 
-      {user && (
-        <button
-          onClick={() => navigate("/board/new")}
-          className="fixed bottom-20 right-4 w-12 h-12 bg-blue-600 text-white rounded-full shadow-lg text-2xl flex items-center justify-center hover:bg-blue-700 transition-colors"
-        >
-          +
-        </button>
-      )}
+      {/* 플로팅 버튼 */}
+      <button
+        onClick={() => navigate("/board/new")}
+        className="fixed bottom-20 right-4 w-14 h-14 bg-maul rounded-full shadow-lg text-2xl flex items-center justify-center hover:bg-maul-dark transition-colors z-20"
+      >
+        ✏️
+      </button>
     </div>
   );
 }

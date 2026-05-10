@@ -1,160 +1,186 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { logEvent } from "../../api/client";
-import { getUser } from "../../api/auth";
 
-function isNow(time) {
+const DAY_TABS = [
+  { value: "weekday", label: "평일" },
+  { value: "sat", label: "토" },
+  { value: "sun", label: "일·공휴일" },
+];
+
+const DUMMY_SCHEDULES = {
+  weekday: [
+    { time: "08:00", route: "541번", dir: "옥천행" },
+    { time: "10:30", route: "541번", dir: "옥천행" },
+    { time: "12:30", route: "541번", dir: "옥천행" },
+    { time: "15:30", route: "541번", dir: "옥천행" },
+    { time: "17:00", route: "503번", dir: "동이행" },
+  ],
+  sat: [
+    { time: "09:00", route: "541번", dir: "옥천행" },
+    { time: "14:00", route: "541번", dir: "옥천행" },
+  ],
+  sun: [
+    { time: "10:00", route: "541번", dir: "옥천행" },
+  ],
+};
+
+function isPast(timeStr) {
   const now = new Date();
-  const [h, m] = time.split(":").map(Number);
-  const dep = new Date(now);
-  dep.setHours(h, m, 0, 0);
-  return Math.abs(now - dep) <= 1200000; // ±20분
+  const [h, m] = timeStr.split(":").map(Number);
+  const t = new Date(now);
+  t.setHours(h, m, 0, 0);
+  return now > t;
 }
 
-function isPast(time) {
+function minutesUntil(timeStr) {
   const now = new Date();
-  const [h, m] = time.split(":").map(Number);
-  const dep = new Date(now);
-  dep.setHours(h, m, 0, 0);
-  return now > dep;
+  const [h, m] = timeStr.split(":").map(Number);
+  const t = new Date(now);
+  t.setHours(h, m, 0, 0);
+  return Math.round((t - now) / 60000);
 }
 
-function minutesUntil(time) {
-  const now = new Date();
-  const [h, m] = time.split(":").map(Number);
-  const dep = new Date(now);
-  dep.setHours(h, m, 0, 0);
-  return Math.round((dep - now) / 60000);
+function Toast({ msg }) {
+  return (
+    <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-ink text-white text-sm px-4 py-2.5 rounded-full shadow-lg z-50 fade-in">
+      {msg}
+    </div>
+  );
 }
 
 export default function BusStopPage() {
   const { stopId } = useParams();
   const navigate = useNavigate();
-  const user = getUser();
-  const [stop, setStop] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [voting, setVoting] = useState(null);
+  const [day, setDay] = useState("weekday");
+  const [fav, setFav] = useState(stopId === "1");
+  const [toast, setToast] = useState("");
+  const [apiStop, setApiStop] = useState(null);
 
   useEffect(() => {
     api.get(`/bus/stops/${stopId}`)
-      .then(r => setStop(r.data))
-      .finally(() => setLoading(false));
+      .then(r => setApiStop(r.data))
+      .catch(() => {});
+    logEvent("stop_viewed", { stop_id: Number(stopId) });
   }, [stopId]);
 
-  async function handleVote(scheduleId, isCorrect) {
-    if (!user) return navigate("/login");
-    setVoting(scheduleId);
-    try {
-      const r = await api.post(`/bus/schedules/${scheduleId}/vote`, { is_correct: isCorrect });
-      setStop(s => ({
-        ...s,
-        schedules: s.schedules.map(sch =>
-          sch.id === scheduleId
-            ? { ...sch, vote_yes: r.data.vote_yes, vote_no: r.data.vote_no, my_vote: isCorrect }
-            : sch
-        ),
-      }));
-      logEvent(isCorrect ? "bus_vote_yes" : "bus_vote_no", { schedule_id: scheduleId, stop_id: Number(stopId) });
-    } catch (err) {
-      alert(err.response?.data?.detail || "투표 실패");
-    } finally {
-      setVoting(null);
-    }
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2500);
   }
 
-  if (loading) return <div className="p-8 text-center text-gray-400">불러오는 중...</div>;
-  if (!stop) return <div className="p-8 text-center text-gray-400">정류장을 찾을 수 없습니다</div>;
-
-  const upcoming = stop.schedules.filter(s => !isPast(s.departure_time));
-  const nextBus = upcoming[0];
+  const stopName = apiStop?.name ?? (stopId === "1" ? "청산주차장" : `정류장 ${stopId}`);
+  const schedules = DUMMY_SCHEDULES[day];
+  const nextIdx = schedules.findIndex(s => !isPast(s.time));
+  const nextBus = nextIdx >= 0 ? schedules[nextIdx] : null;
+  const nextMins = nextBus ? minutesUntil(nextBus.time) : null;
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <header className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate(-1)} className="text-gray-500 text-xl">←</button>
-        <div>
-          <h1 className="text-base font-bold text-gray-900">🚏 {stop.name}</h1>
-          {stop.code && <p className="text-xs text-gray-400">정류장 코드: {stop.code}</p>}
+    <div className="min-h-screen bg-cream">
+      {toast && <Toast msg={toast} />}
+
+      {/* 헤더 */}
+      <header className="px-5 pt-14 pb-3 flex items-center justify-between sticky top-0 bg-cream z-10">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="text-ink text-xl font-light">←</button>
+          <h1 className="text-base font-bold text-ink">{stopName}</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setFav(v => !v)} className="text-xl">
+            {fav ? "⭐" : "☆"}
+          </button>
+          <button
+            onClick={() => navigate(`/bus/alarm/${stopId}`)}
+            className="text-xl"
+          >
+            🔔
+          </button>
         </div>
       </header>
 
-      {nextBus && (
-        <div className="bg-blue-600 text-white px-4 py-4 text-center">
-          <p className="text-xs opacity-80 mb-1">다음 버스</p>
-          <p className="text-3xl font-bold">{minutesUntil(nextBus.departure_time)}분 후</p>
-          <p className="text-sm opacity-90 mt-1">{nextBus.departure_time} · {nextBus.route_name}</p>
+      {/* 요일 탭 */}
+      <div className="px-4 mb-4">
+        <div className="bg-white rounded-2xl flex overflow-hidden shadow-sm">
+          {DAY_TABS.map(t => (
+            <button
+              key={t.value}
+              onClick={() => setDay(t.value)}
+              className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${
+                day === t.value
+                  ? "border-maul text-ink font-bold"
+                  : "border-transparent text-sub"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+          <div className="flex items-center px-3">
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full whitespace-nowrap">🌱봄철</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 다음 버스 카드 */}
+      {nextBus ? (
+        <div className="mx-4 mb-4 bg-maul rounded-2xl p-5 shadow-sm fade-in">
+          <p className="text-xs text-ink/60 font-medium mb-1">다음 버스</p>
+          <p className="text-4xl font-bold text-ink">{nextMins}분 후</p>
+          <p className="text-sm text-ink/70 mt-1">{nextBus.dir} · {nextBus.route}</p>
+        </div>
+      ) : (
+        <div className="mx-4 mb-4 bg-gray-200 rounded-2xl p-5 text-center fade-in">
+          <p className="text-sm text-sub">오늘 운행 종료</p>
         </div>
       )}
 
-      {!nextBus && (
-        <div className="bg-gray-200 text-gray-600 px-4 py-4 text-center">
-          <p className="text-sm">오늘 운행 종료</p>
+      {/* 시간표 */}
+      <div className="mx-4 bg-white rounded-2xl shadow-sm overflow-hidden fade-in-1">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <span className="text-sm font-bold text-ink">오늘의 시간표</span>
+          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">[봄철]</span>
         </div>
-      )}
+        {schedules.map((s, i) => {
+          const past = isPast(s.time);
+          const isNext = i === nextIdx;
+          return (
+            <div
+              key={i}
+              className={`flex items-center px-5 py-3 ${i > 0 ? "border-t border-gray-50" : ""} ${
+                isNext ? "bg-maul/10" : ""
+              }`}
+            >
+              <span
+                className={`font-mono text-sm w-14 ${
+                  past ? "text-gray-300 line-through" : isNext ? "text-ink font-bold" : "text-ink"
+                }`}
+              >
+                {s.time}
+              </span>
+              <span
+                className={`text-sm ml-3 flex-1 ${
+                  past ? "text-gray-300 line-through" : isNext ? "text-ink font-bold" : "text-sub"
+                }`}
+              >
+                {s.dir} {s.route}
+              </span>
+              {isNext && (
+                <span className="text-xs bg-maul text-ink font-bold px-2 py-0.5 rounded-full">
+                  다음
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-      <div className="p-4">
-        <h2 className="text-sm font-bold text-gray-700 mb-3">오늘 시간표</h2>
-        <div className="bg-white rounded-xl overflow-hidden border border-gray-100">
-          {stop.schedules.length === 0 ? (
-            <p className="text-center text-gray-400 py-6 text-sm">등록된 시간표가 없습니다</p>
-          ) : (
-            stop.schedules.map((sch, i) => {
-              const past = isPast(sch.departure_time);
-              const canVote = isNow(sch.departure_time);
-              const voted = sch.my_vote !== null && sch.my_vote !== undefined;
-              return (
-                <div
-                  key={sch.id}
-                  className={`flex items-center gap-3 px-4 py-3 ${
-                    i > 0 ? "border-t border-gray-50" : ""
-                  } ${past ? "opacity-50" : ""}`}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: sch.color }}
-                  />
-                  <div className="flex-1">
-                    <span className="font-mono text-sm font-medium text-gray-900">{sch.departure_time}</span>
-                    <span className="text-xs text-gray-500 ml-2">{sch.route_number}번 {sch.direction && `→ ${sch.direction}`}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                    <span>✅{sch.vote_yes}</span>
-                    <span>❌{sch.vote_no}</span>
-                  </div>
-                  {canVote && !voted && (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleVote(sch.id, true)}
-                        disabled={voting === sch.id}
-                        className="w-9 h-9 rounded-lg bg-green-100 text-green-700 text-base hover:bg-green-200 transition-colors disabled:opacity-50"
-                      >
-                        ✅
-                      </button>
-                      <button
-                        onClick={() => handleVote(sch.id, false)}
-                        disabled={voting === sch.id}
-                        className="w-9 h-9 rounded-lg bg-red-100 text-red-700 text-base hover:bg-red-200 transition-colors disabled:opacity-50"
-                      >
-                        ❌
-                      </button>
-                    </div>
-                  )}
-                  {voted && (
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${sch.my_vote ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                      {sch.my_vote ? "✅ 투표완료" : "❌ 투표완료"}
-                    </span>
-                  )}
-                  {!canVote && !voted && past && (
-                    <span className="text-xs text-gray-300">종료</span>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-        <p className="text-xs text-gray-400 mt-3 text-center">
-          배차 시각 ±20분 이내에 O/X 투표로 실제 운행을 확인해요
-        </p>
+      {/* 노선도 버튼 */}
+      <div className="mx-4 mt-4 mb-8">
+        <button
+          onClick={() => navigate("/bus/route")}
+          className="btn-maul"
+        >
+          🗺 이 정류장 노선도
+        </button>
       </div>
     </div>
   );

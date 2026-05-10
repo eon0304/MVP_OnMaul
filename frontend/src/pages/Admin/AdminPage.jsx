@@ -1,243 +1,282 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { logEvent } from "../../api/client";
-import { getUser } from "../../api/auth";
 
-const NOTICE_CATEGORIES = [
-  { value: "", label: "전체" },
-  { value: "면사무소", label: "🏛️ 면사무소" },
-  { value: "이장", label: "👤 이장" },
-  { value: "자치회", label: "🤝 자치회" },
+/* ─── 더미 데이터 ─── */
+const TODAY = new Date(2026, 4, 8); // 2026-05-08 (금)
+
+const DUMMY_SCHEDULE = [
+  { id: 1, date: new Date(2026, 4, 8), time: "19:00", title: "마을회의", place: "마을회관", host: "자치회", agendas: 5 },
+  { id: 2, date: new Date(2026, 4, 8), time: "14:00", title: "농약 안전교육", place: "면사무소 대회의실", host: "면사무소" },
+  { id: 3, date: new Date(2026, 4, 9), time: "14:00", title: "농약 안전교육", place: "면사무소 대회의실", host: "면사무소" },
+  { id: 4, date: new Date(2026, 4, 10), time: "09:00", title: "분리수거 합동의 날", place: "마을 곳곳", host: "자치회" },
+  { id: 5, date: new Date(2026, 4, 12), time: "10:00", title: "마을 가로등 정비 회의", place: "마을회관", host: "이장" },
 ];
 
-const EVENT_TYPES = {
-  festival: { label: "🎉 축제·행사", color: "bg-pink-100 text-pink-700" },
-  policy: { label: "📋 지원정책", color: "bg-blue-100 text-blue-700" },
-  meeting: { label: "📅 회의·행정", color: "bg-gray-100 text-gray-700" },
+const HOST_COLOR = {
+  자치회: "bg-[#FFE8E8] text-[#C0392B]",
+  면사무소: "bg-[#F5C842] text-[#7A6A00]",
+  이장: "bg-[#E8F4E8] text-[#2E7D32]",
 };
 
-function CalendarTab() {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const now = new Date();
+/* ─── 주간 날짜 바 ─── */
+const KO_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-  useEffect(() => {
-    logEvent("tab_view", { tab_name: "admin_calendar" });
-    api.get("/admin/calendar", { params: { year: now.getFullYear(), month: now.getMonth() + 1 } })
-      .then(r => setEvents(r.data))
-      .finally(() => setLoading(false));
-  }, []);
+function getWeekDates(base) {
+  const dow = base.getDay();
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base);
+    d.setDate(base.getDate() - dow + i);
+    return d;
+  });
+}
 
-  if (loading) return <div className="p-8 text-center text-gray-400">불러오는 중...</div>;
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
+
+function hasEvent(date) {
+  return DUMMY_SCHEDULE.some(e => sameDay(e.date, date));
+}
+
+/* ─── 월 달력 ─── */
+function MonthCalendar({ selectedDate, onSelect }) {
+  const year = TODAY.getFullYear();
+  const month = TODAY.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = Array.from({ length: firstDay }, () => null)
+    .concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
 
   return (
-    <div className="p-4 space-y-3">
-      <p className="text-sm font-medium text-gray-600">
-        {now.getFullYear()}년 {now.getMonth() + 1}월 일정
-      </p>
-      {events.length === 0 ? (
-        <div className="text-center py-10">
-          <p className="text-3xl mb-2">📅</p>
-          <p className="text-gray-400 text-sm">이번 달 등록된 일정이 없어요</p>
-        </div>
-      ) : (
-        events.map(ev => {
-          const typeInfo = EVENT_TYPES[ev.event_type] || EVENT_TYPES.meeting;
+    <div className="mx-4 bg-white rounded-2xl shadow-sm overflow-hidden fade-in">
+      <div className="grid grid-cols-7 text-center text-xs text-sub py-2 border-b border-gray-100">
+        {KO_DAYS.map(d => <span key={d} className="py-1">{d}</span>)}
+      </div>
+      <div className="grid grid-cols-7">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} />;
+          const date = new Date(year, month, day);
+          const isToday = sameDay(date, TODAY);
+          const isSelected = selectedDate && sameDay(date, selectedDate);
+          const hasDot = hasEvent(date);
           return (
-            <div
-              key={ev.id}
-              className="card cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => logEvent("schedule_clicked", { schedule_id: ev.id, schedule_type: ev.event_type })}
+            <button
+              key={i}
+              onClick={() => onSelect(date)}
+              className="flex flex-col items-center py-2 relative"
             >
-              <div className="flex items-start gap-3">
-                <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${typeInfo.color}`}>
-                  {typeInfo.label}
-                </span>
-                <div>
-                  <p className="font-medium text-gray-900 text-sm">{ev.title}</p>
-                  {ev.description && <p className="text-xs text-gray-500 mt-0.5">{ev.description}</p>}
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(ev.event_date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}
-                  </p>
-                </div>
-              </div>
-            </div>
+              <span
+                className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-colors ${
+                  isSelected ? "bg-maul text-ink font-bold" :
+                  isToday ? "bg-maul/30 text-ink font-bold" :
+                  "text-ink"
+                }`}
+              >
+                {day}
+              </span>
+              {hasDot && (
+                <span className="w-1 h-1 rounded-full bg-maul mt-0.5" />
+              )}
+            </button>
           );
-        })
-      )}
+        })}
+      </div>
     </div>
   );
 }
 
-function NoticesTab() {
-  const [notices, setNotices] = useState([]);
-  const [category, setCategory] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    api.get("/admin/notices", { params: category ? { category } : {} })
-      .then(r => setNotices(r.data))
-      .finally(() => setLoading(false));
-  }, [category]);
-
-  if (selected) {
-    return (
-      <div className="p-4">
-        <button onClick={() => setSelected(null)} className="text-blue-600 text-sm mb-4 flex items-center gap-1">
-          ← 목록으로
-        </button>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selected.category}</span>
-          {selected.is_pinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">📌 고정</span>}
-        </div>
-        <h2 className="text-lg font-bold text-gray-900 mb-1">{selected.title}</h2>
-        <p className="text-xs text-gray-400 mb-4">
-          {selected.author_nickname} · {new Date(selected.created_at).toLocaleDateString("ko-KR")}
-        </p>
-        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{selected.content}</p>
+/* ─── 일정 카드 ─── */
+function ScheduleCard({ ev, onClick }) {
+  const colorClass = HOST_COLOR[ev.host] || "bg-gray-100 text-gray-700";
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-white rounded-2xl shadow-sm p-4 hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${colorClass}`}>
+          {ev.host}
+        </span>
+        <span className="text-xs text-sub ml-auto">{ev.time}</span>
       </div>
-    );
-  }
+      <p className="text-sm font-bold text-ink">{ev.title}</p>
+      <p className="text-xs text-sub mt-1">📍 {ev.place}{ev.agendas ? ` · 안건 ${ev.agendas}건` : ""}</p>
+    </button>
+  );
+}
+
+/* ─── Toast ─── */
+function Toast({ msg }) {
+  return (
+    <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-ink text-white text-sm px-4 py-2.5 rounded-full shadow-lg z-50 fade-in">
+      {msg}
+    </div>
+  );
+}
+
+/* ─── 주간 어젠다 뷰 ─── */
+function WeekView({ onEventClick }) {
+  const [selected, setSelected] = useState(TODAY);
+  const weekDates = getWeekDates(TODAY);
+
+  const daySchedules = (date) => DUMMY_SCHEDULE.filter(e => sameDay(e.date, date));
 
   return (
-    <div>
-      <div className="px-4 pt-3 pb-2 overflow-x-auto">
+    <>
+      {/* 주간 날짜 바 */}
+      <div className="overflow-x-auto px-4 pb-3">
         <div className="flex gap-2 w-max">
-          {NOTICE_CATEGORIES.map(c => (
-            <button
-              key={c.value}
-              onClick={() => setCategory(c.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                category === c.value ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+          {weekDates.map((d, i) => {
+            const isToday = sameDay(d, TODAY);
+            const isSelected = sameDay(d, selected);
+            const hasDot = hasEvent(d);
+            return (
+              <button
+                key={i}
+                onClick={() => setSelected(d)}
+                className="flex flex-col items-center w-10"
+              >
+                <span className="text-xs text-sub mb-1">{KO_DAYS[d.getDay()]}</span>
+                <span
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                    isSelected ? "bg-maul text-ink font-bold" :
+                    isToday ? "bg-maul/30 text-ink" :
+                    "text-ink"
+                  }`}
+                >
+                  {d.getDate()}
+                </span>
+                {hasDot && <span className="w-1 h-1 rounded-full bg-maul mt-1" />}
+              </button>
+            );
+          })}
         </div>
       </div>
-      <div className="p-4 space-y-2">
-        {loading ? (
-          <div className="text-center py-8 text-gray-400">불러오는 중...</div>
-        ) : notices.length === 0 ? (
-          <div className="text-center py-10">
-            <p className="text-3xl mb-2">📢</p>
-            <p className="text-gray-400 text-sm">등록된 공지사항이 없어요</p>
+
+      {/* 선택 날짜 일정 */}
+      <div className="px-4 space-y-2 fade-in">
+        <p className="text-xs text-sub font-medium">
+          {selected.getMonth() + 1}월 {selected.getDate()}일 ({KO_DAYS[selected.getDay()]})
+          {sameDay(selected, TODAY) ? " · 오늘" : ""}
+        </p>
+        {daySchedules(selected).length === 0 ? (
+          <div className="bg-white rounded-2xl p-6 text-center text-sub text-sm shadow-sm">
+            이 날은 등록된 일정이 없어요
           </div>
         ) : (
-          notices.map(n => (
-            <div
-              key={n.id}
-              onClick={() => setSelected(n)}
-              className="card cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{n.category}</span>
-                {n.is_pinned && <span className="text-xs text-yellow-600">📌</span>}
-                <span className="text-xs text-gray-400 ml-auto">{new Date(n.created_at).toLocaleDateString("ko-KR")}</span>
-              </div>
-              <p className="font-medium text-gray-900 text-sm">{n.title}</p>
-              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.content}</p>
-            </div>
+          daySchedules(selected).map(ev => (
+            <ScheduleCard key={ev.id} ev={ev} onClick={() => onEventClick(ev)} />
           ))
         )}
       </div>
-    </div>
+    </>
   );
 }
 
-function MeetingsTab() {
-  const [meetings, setMeetings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
-
-  useEffect(() => {
-    logEvent("council_tab_click");
-    api.get("/admin/meetings")
-      .then(r => setMeetings(r.data))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (selected) {
-    return (
-      <div className="p-4">
-        <button onClick={() => setSelected(null)} className="text-blue-600 text-sm mb-4">← 목록으로</button>
-        <h2 className="text-lg font-bold text-gray-900 mb-1">{selected.title}</h2>
-        <p className="text-xs text-gray-400 mb-4">
-          {selected.author_nickname} · 회의일: {new Date(selected.meeting_date).toLocaleDateString("ko-KR")}
-        </p>
-        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{selected.content}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 space-y-2">
-      {loading ? (
-        <div className="text-center py-8 text-gray-400">불러오는 중...</div>
-      ) : meetings.length === 0 ? (
-        <div className="text-center py-10">
-          <p className="text-3xl mb-2">📋</p>
-          <p className="text-gray-400 text-sm">아직 등록된 회의록이 없어요</p>
-          <p className="text-xs text-gray-400 mt-1">곧 업데이트 예정입니다</p>
-        </div>
-      ) : (
-        meetings.map(m => (
-          <div
-            key={m.id}
-            onClick={() => { logEvent("council_detail_open", { meeting_id: m.id }); setSelected(m); }}
-            className="card cursor-pointer hover:shadow-md transition-shadow"
-          >
-            <p className="font-medium text-gray-900 text-sm">{m.title}</p>
-            <p className="text-xs text-gray-400 mt-1">
-              회의일: {new Date(m.meeting_date).toLocaleDateString("ko-KR")} · {m.author_nickname}
-            </p>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
+/* ─── 메인 컴포넌트 ─── */
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState("calendar");
+  const navigate = useNavigate();
+  const [tab, setTab] = useState("schedule");
+  const [calView, setCalView] = useState("week");
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [toast, setToast] = useState("");
 
   useEffect(() => {
     logEvent("tab_view", { tab_name: "admin" });
   }, []);
 
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2500);
+  }
+
+  function handleTabChange(t) {
+    if (t === "notice") { navigate("/admin/notices?type=notice"); return; }
+    if (t === "minutes") { navigate("/admin/notices?type=minutes"); return; }
+    setTab("schedule");
+  }
+
+  function handleEventClick(ev) {
+    navigate(`/admin/detail/${ev.id}`);
+  }
+
+  const monthSelected = selectedDate
+    ? DUMMY_SCHEDULE.filter(e => sameDay(e.date, selectedDate))
+    : [];
+
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
-        <h1 className="text-lg font-bold text-blue-600">📅 행정 정보</h1>
-        <p className="text-xs text-gray-400 mt-0.5">청산면 공지·일정·회의록</p>
+    <div className="min-h-screen bg-cream">
+      {toast && <Toast msg={toast} />}
+
+      {/* 헤더 */}
+      <header className="px-5 pt-14 pb-3 flex items-center justify-between sticky top-0 bg-cream z-10">
+        <h1 className="text-xl font-bold text-ink">행정</h1>
+        <button onClick={() => showToast("다국어 지원 준비 중입니다")} className="text-xl">
+          🌐
+        </button>
       </header>
 
-      <div className="flex bg-white border-b border-gray-200">
-        {[
-          { key: "calendar", label: "일정" },
-          { key: "notices", label: "공지사항" },
-          { key: "meetings", label: "회의록" },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`flex-1 py-2.5 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === t.key
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* 상단 탭 */}
+      <div className="px-4 mb-3">
+        <div className="bg-white rounded-2xl flex overflow-hidden shadow-sm">
+          {[
+            { key: "schedule", label: "📅 일정" },
+            { key: "notice",   label: "📢 공지" },
+            { key: "minutes",  label: "📋 회의록" },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => handleTabChange(t.key)}
+              className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${
+                tab === t.key
+                  ? "border-maul text-ink font-bold"
+                  : "border-transparent text-sub"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {activeTab === "calendar" && <CalendarTab />}
-      {activeTab === "notices" && <NoticesTab />}
-      {activeTab === "meetings" && <MeetingsTab />}
+      {/* 뷰 전환 토글 */}
+      <div className="flex items-center justify-end px-5 mb-3">
+        <button
+          onClick={() => setCalView(v => v === "week" ? "month" : "week")}
+          className="text-xs text-sub underline underline-offset-2"
+        >
+          {calView === "week" ? "월별로 보기 ›" : "주간으로 보기 ›"}
+        </button>
+      </div>
+
+      {calView === "week" ? (
+        <WeekView onEventClick={handleEventClick} />
+      ) : (
+        <>
+          <MonthCalendar selectedDate={selectedDate} onSelect={setSelectedDate} />
+          {selectedDate && (
+            <div className="px-4 mt-4 space-y-2 fade-in">
+              <p className="text-xs text-sub font-medium px-1">
+                {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 일정
+              </p>
+              {monthSelected.length === 0 ? (
+                <div className="bg-white rounded-2xl p-5 text-center text-sub text-sm shadow-sm">
+                  이 날은 등록된 일정이 없어요
+                </div>
+              ) : (
+                monthSelected.map(ev => (
+                  <ScheduleCard key={ev.id} ev={ev} onClick={() => handleEventClick(ev)} />
+                ))
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="h-8" />
     </div>
   );
 }
