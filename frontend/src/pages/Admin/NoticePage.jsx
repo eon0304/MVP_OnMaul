@@ -28,7 +28,8 @@ export default function NoticePage() {
   useEffect(() => {
     api.get("/admin/notices", { params: viewType === "minutes" ? { category: "회의록" } : {} })
       .then(r => {
-        const mapped = r.data.map(n => ({
+        const list = Array.isArray(r.data) ? r.data : [];
+        const mapped = list.map(n => ({
           id: `api-${n.id}`,
           source: n.category,
           daysAgo: new Date(n.created_at).toLocaleDateString("ko-KR"),
@@ -42,7 +43,7 @@ export default function NoticePage() {
       .catch(() => {});
   }, [viewType]);
 
-  const displayed = notices
+  const displayed = (Array.isArray(notices) ? notices : [])
     .filter(n => viewType === "minutes" ? n.type === "minutes" : n.type === "notice")
     .filter(n => filter === "전체" || n.source === filter);
 

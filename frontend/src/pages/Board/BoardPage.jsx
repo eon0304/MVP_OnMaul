@@ -80,7 +80,7 @@ export default function BoardPage() {
   useEffect(() => {
     logEvent("tab_view", { tab_name: "board" });
     api.get("/posts", { params: category ? { category } : {} })
-      .then(r => setApiPosts(r.data))
+      .then(r => setApiPosts(Array.isArray(r.data) ? r.data : []))
       .catch(() => setApiPosts([]));
   }, [category]);
 
@@ -124,7 +124,7 @@ export default function BoardPage() {
         ) : (
           allPosts.map(p => <FeedItem key={p.id} post={p} />)
         )}
-        {apiPosts.map(p => <ApiFeedItem key={`api-${p.id}`} post={p} />)}
+        {(Array.isArray(apiPosts) ? apiPosts : []).map(p => <ApiFeedItem key={`api-${p.id}`} post={p} />)}
       </div>
 
       {/* 플로팅 버튼 */}

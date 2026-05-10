@@ -48,9 +48,12 @@ export default function PostDetailPage() {
         setApiPost(r.data);
         setLikeCount(r.data.like_count ?? 8);
         setLiked(r.data.is_liked ?? false);
-        if (r.data.comments?.length) setComments(r.data.comments.map(c => ({
-          id: c.id, author: c.author_nickname, type: c.author_type, text: c.content
-        })));
+        const rawComments = r.data.comments;
+        if (Array.isArray(rawComments) && rawComments.length) {
+          setComments(rawComments.map(c => ({
+            id: c.id, author: c.author_nickname, type: c.author_type, text: c.content
+          })));
+        }
         logEvent("post_viewed", { post_id: Number(id), category: r.data.category });
       })
       .catch(() => {});

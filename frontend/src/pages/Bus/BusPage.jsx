@@ -32,7 +32,7 @@ export default function BusPage() {
 
   useEffect(() => {
     api.get("/bus/stops")
-      .then(r => setApiStops(r.data))
+      .then(r => setApiStops(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
   }, []);
 
@@ -122,7 +122,7 @@ export default function BusPage() {
           ))
         )}
         {/* API 정류장 */}
-        {apiStops.map((s, i) => (
+        {(Array.isArray(apiStops) ? apiStops : []).map((s, i) => (
           <div
             key={`api-${s.id}`}
             className="flex items-center px-5 py-4 border-t border-gray-100 cursor-pointer hover:bg-gray-50"

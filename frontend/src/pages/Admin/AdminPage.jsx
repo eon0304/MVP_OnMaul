@@ -120,9 +120,10 @@ function Toast({ msg }) {
 /* ─── 주간 어젠다 뷰 ─── */
 function WeekView({ onEventClick }) {
   const [selected, setSelected] = useState(TODAY);
-  const weekDates = getWeekDates(TODAY);
+  const weekDates = Array.isArray(getWeekDates(TODAY)) ? getWeekDates(TODAY) : [];
 
-  const daySchedules = (date) => DUMMY_SCHEDULE.filter(e => sameDay(e.date, date));
+  const daySchedules = (date) =>
+    (Array.isArray(DUMMY_SCHEDULE) ? DUMMY_SCHEDULE : []).filter(e => sameDay(e.date, date));
 
   return (
     <>
@@ -204,7 +205,7 @@ export default function AdminPage() {
   }
 
   const monthSelected = selectedDate
-    ? DUMMY_SCHEDULE.filter(e => sameDay(e.date, selectedDate))
+    ? (Array.isArray(DUMMY_SCHEDULE) ? DUMMY_SCHEDULE : []).filter(e => sameDay(e.date, selectedDate))
     : [];
 
   return (
