@@ -19,9 +19,14 @@ import HanMadiListPage from "./pages/Board/HanMadiListPage";
 
 const FontSizeCtx = createContext({ large: false, toggle: () => {} });
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
 function BottomNav() {
   const { pathname } = useLocation();
-  const { large, toggle } = useContext(FontSizeCtx);
   const tabs = [
     { to: "/home",  icon: "⌂",  label: "홈" },
     { to: "/board", icon: "☷",  label: "게시판" },
@@ -48,24 +53,32 @@ function BottomNav() {
           </NavLink>
         );
       })}
-      <button
-        onClick={toggle}
-        className={`flex flex-col items-center justify-center py-2.5 px-3 text-xs border-l border-gray-100 transition-colors min-w-[52px] ${
-          large ? "text-maul-dark font-bold" : "text-sub"
-        }`}
-      >
-        <span className="font-bold leading-none" style={{ fontSize: large ? "1.1rem" : "1rem" }}>
-          {large ? "가−" : "가+"}
-        </span>
-        <span className="mt-0.5">글자</span>
-      </button>
     </nav>
+  );
+}
+
+function FontSizeButton() {
+  const { large, toggle } = useContext(FontSizeCtx);
+  return (
+    <button
+      onClick={toggle}
+      className={`fixed bottom-20 right-4 z-50 w-11 h-11 rounded-full shadow-md flex items-center justify-center transition-colors ${
+        large ? "bg-maul-dark text-white" : "bg-white text-ink border border-gray-200"
+      }`}
+      aria-label="글자 크기 조절"
+    >
+      <span className="font-bold text-sm leading-none">
+        {large ? "가−" : "가+"}
+      </span>
+    </button>
   );
 }
 
 function AppLayout() {
   return (
-    <div className="pb-16 min-h-screen bg-cream">
+    <div className="pb-16 min-h-screen">
+      <ScrollToTop />
+      <FontSizeButton />
       <Outlet />
       <BottomNav />
     </div>

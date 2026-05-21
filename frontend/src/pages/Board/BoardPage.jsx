@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api, { logEvent } from "../../api/client";
 import { getUser } from "../../api/auth";
@@ -78,6 +78,8 @@ export default function BoardPage() {
   const [category, setCategory] = useState("");
   const [apiPosts, setApiPosts] = useState([]);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [search, setSearch] = useState("");
+  const searchRef = useRef(null);
 
   useEffect(() => {
     logEvent("tab_view", { tab_name: "board" });
@@ -86,41 +88,57 @@ export default function BoardPage() {
       .catch(() => setApiPosts([]));
   }, [category]);
 
-  const filteredDummy = category
-    ? DUMMY_POSTS.filter(p => p.category === category)
-    : DUMMY_POSTS;
+  const filteredDummy = DUMMY_POSTS.filter(p => {
+    if (category && p.category !== category) return false;
+    if (search.trim()) return p.title.includes(search.trim()) || p.category.includes(search.trim());
+    return true;
+  });
 
   const allPosts = [...filteredDummy];
 
   return (
-    <div className="min-h-screen bg-cream">
-      {/* 헤더 */}
-      <header className="bg-cream px-5 pt-14 pb-3 flex items-center justify-between sticky top-0 z-10">
-        <h1 className="text-xl font-bold text-ink">게시판</h1>
-        <button className="text-ink text-lg">🔍</button>
-      </header>
+    <div className="min-h-screen">
+      {/* 헤더 + 카테고리 sticky */}
+      <div className="sticky top-0 z-10 bg-white">
+        <header className="px-5 pt-14 pb-3">
+          <h1 className="text-xl font-bold text-ink mb-3">게시판</h1>
+          <div className="flex items-center bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-200">
+            <span className="text-sub mr-2 text-sm">🔍</span>
+            <input
+              ref={searchRef}
+              className="flex-1 text-sm text-ink bg-transparent outline-none placeholder-sub"
+              placeholder="제목, 카테고리로 검색"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="text-sub text-xs ml-1">✕</button>
+            )}
+          </div>
+        </header>
 
-      {/* 카테고리 칩 */}
-      <div className="px-4 pb-3 overflow-x-auto">
-        <div className="flex gap-2 w-max">
-          {CATEGORIES.map(c => (
-            <button
-              key={c.value}
-              onClick={() => setCategory(c.value)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
-                category === c.value
-                  ? "bg-maul border-maul text-ink font-bold"
-                  : "border-gray-300 text-sub bg-white"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+        {/* 카테고리 칩 */}
+        <div className="px-4 pb-3 overflow-x-auto">
+          <div className="flex gap-2 w-max">
+            {CATEGORIES.map(c => (
+              <button
+                key={c.value}
+                onClick={() => setCategory(c.value)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
+                  category === c.value
+                    ? "bg-maul border-maul text-ink font-bold"
+                    : "border-gray-300 text-sub bg-white"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* 피드 */}
-      <div className="bg-white rounded-2xl mx-4 shadow-sm overflow-hidden fade-in">
+      <div className="bg-white rounded-2xl mx-4 mt-3 shadow-sm overflow-hidden fade-in">
         {allPosts.length === 0 ? (
           <p className="text-center py-10 text-sub text-sm">이 카테고리의 첫 글을 작성해보세요</p>
         ) : (
@@ -132,7 +150,7 @@ export default function BoardPage() {
       {/* 플로팅 버튼 */}
       <button
         onClick={() => user ? navigate("/board/new") : setShowLoginPrompt(true)}
-        className="fixed bottom-20 right-4 w-14 h-14 bg-maul rounded-full shadow-lg text-2xl flex items-center justify-center hover:bg-maul-dark transition-colors z-20"
+        className="fixed bottom-36 right-4 w-14 h-14 bg-maul rounded-full shadow-lg text-2xl flex items-center justify-center hover:bg-maul-dark transition-colors z-20"
       >
         ✏️
       </button>

@@ -1,15 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply font-sans bg-cream text-ink;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    @apply text-ink;
     margin: 0;
+    background: linear-gradient(to bottom, #ffffff 0%, #ffffff 50%, #E3FFD7 100%);
+    background-attachment: fixed;
   }
   #root {
-    @apply max-w-[390px] mx-auto min-h-screen bg-cream;
+    @apply max-w-[390px] mx-auto min-h-screen;
   }
 }
 

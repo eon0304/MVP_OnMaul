@@ -40,35 +40,37 @@ export default function BusPage() {
   });
 
   return (
-    <div className="min-h-screen bg-cream">
-      <header className="px-5 pt-14 pb-3 sticky top-0 bg-cream z-10">
-        <h1 className="text-xl font-bold text-ink mb-3">버스</h1>
-        <div className="flex items-center bg-white rounded-xl px-3 py-2.5 border border-gray-200">
-          <span className="text-sub mr-2 text-sm">🔍</span>
-          <input
-            className="flex-1 text-sm text-ink bg-transparent outline-none placeholder-sub"
-            placeholder="노선번호, 지역명으로 검색"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="text-sub text-xs ml-1">✕</button>
-          )}
-        </div>
-      </header>
+    <div className="min-h-screen">
+      <div className="sticky top-0 z-10 bg-white">
+        <header className="px-5 pt-14 pb-3">
+          <h1 className="text-xl font-bold text-ink mb-3">버스</h1>
+          <div className="flex items-center bg-white rounded-xl px-3 py-2.5 border border-gray-200">
+            <span className="text-sub mr-2 text-sm">🔍</span>
+            <input
+              className="flex-1 text-sm text-ink bg-transparent outline-none placeholder-sub"
+              placeholder="노선번호, 지역명으로 검색"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="text-sub text-xs ml-1">✕</button>
+            )}
+          </div>
+        </header>
 
-      <div className="flex gap-4 px-5 mb-3 border-b border-gray-200">
-        {[["all", "전체 버스"], ["fav", "즐겨찾기"]].map(([v, l]) => (
-          <button
-            key={v}
-            onClick={() => setTab(v)}
-            className={`pb-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === v ? "border-maul-dark text-ink font-bold" : "border-transparent text-sub"
-            }`}
-          >
-            {l}
-          </button>
-        ))}
+        <div className="flex gap-4 px-5 mb-0 border-b border-gray-200">
+          {[["all", "전체 버스"], ["fav", "즐겨찾기"]].map(([v, l]) => (
+            <button
+              key={v}
+              onClick={() => setTab(v)}
+              className={`pb-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                tab === v ? "border-maul-dark text-ink font-bold" : "border-transparent text-sub"
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="px-4 pb-24 space-y-2">

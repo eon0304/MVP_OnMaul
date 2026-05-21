@@ -66,7 +66,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream pb-24">
+    <div className="min-h-screen pb-24">
       {toast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-ink text-white text-sm px-4 py-2.5 rounded-full shadow-lg z-50 fade-in">
           {toast}
@@ -79,7 +79,7 @@ export default function HomePage() {
           {DUMMY.nickname} 님 🌿
         </h1>
         <p className="text-xs text-sub mt-1">
-          청산면 {DUMMY.type} · {DUMMY.date}
+          청산면 {DUMMY.type}
         </p>
       </div>
 
@@ -144,24 +144,6 @@ export default function HomePage() {
               첫 번째 답변을 남겨보세요
             </p>
           )}
-        </div>
-
-        {/* 가까운 정류장 */}
-        <div
-          className="widget-card fade-in-2"
-          onClick={() => navigate("/bus/1")}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-bold text-ink">가까운 정류장</span>
-            <span className="text-xs text-sub">📍 {DUMMY.stop.dist}</span>
-          </div>
-          <p className="text-base font-semibold text-ink">{DUMMY.stop.name}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="bg-maul text-ink text-xs font-bold px-2 py-0.5 rounded-full">
-              {DUMMY.stop.next}
-            </span>
-            <span className="text-xs text-sub">{DUMMY.stop.line}</span>
-          </div>
         </div>
 
         {/* 이번 주 일정 */}
